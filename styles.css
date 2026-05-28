@@ -52,7 +52,7 @@ button {
 }
 
 .app-shell.drawer-expanded {
-  grid-template-rows: minmax(440px, 1fr) 230px;
+  grid-template-rows: minmax(330px, 1fr) 380px;
 }
 
 .topbar {
@@ -1024,6 +1024,15 @@ h2 {
   margin-left: auto;
 }
 
+.drawer-status {
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .drawer-actions button {
   height: 30px;
   padding: 0 10px;
@@ -1080,13 +1089,18 @@ table.data-table {
 
 .ingest-form {
   display: grid;
-  grid-template-columns: minmax(160px, 0.85fr) minmax(180px, 1fr) minmax(260px, 1.5fr) auto;
+  grid-template-columns: minmax(170px, 1fr) minmax(170px, 1fr) auto;
   gap: 10px;
-  align-items: end;
+  align-items: start;
   padding: 12px;
   background: #f8fafc;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.ingest-form > div,
+.ingest-form label:has(textarea) {
+  grid-column: 1 / -1;
 }
 
 .ingest-form strong,
@@ -1128,12 +1142,35 @@ table.data-table {
 }
 
 .ingest-form button {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: end;
+  justify-self: end;
   height: 36px;
   padding: 0 12px;
   color: #ffffff;
   background: var(--blue);
   border: 1px solid var(--blue);
   border-radius: 8px;
+}
+
+.inbox-message {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.inbox-message.processed {
+  color: #067647;
+  background: #ecfdf3;
+  border-color: #abefc6;
+}
+
+.inbox-message.failed {
+  color: #b42318;
+  background: #fef3f2;
+  border-color: #fecdca;
 }
 
 .inbox-subhead {
@@ -1153,6 +1190,15 @@ table.data-table {
   background: #ffffff;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.inbox-item.reference-item.failed {
+  border-color: #fecdca;
+  background: #fff8f7;
+}
+
+.inbox-item.reference-item.processed {
+  border-color: #d0d5dd;
 }
 
 .inbox-item strong,

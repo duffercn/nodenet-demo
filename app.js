@@ -8,7 +8,9 @@ const state = {
   activeTypes: new Set(["product", "technology", "company", "metric"]),
   activeCategories: new Set(),
   search: "",
-  focusedCategory: null
+  focusedCategory: null,
+  inboxMessage: null,
+  drawerMessage: null
 };
 
 let nodes = [];
@@ -60,6 +62,7 @@ const typeGlyphs = {
 const canvas = document.getElementById("graphCanvas");
 const detailPanel = document.getElementById("detailPanel");
 const drawerContent = document.getElementById("drawerContent");
+const drawerStatus = document.getElementById("drawerStatus");
 const searchInput = document.getElementById("searchInput");
 const searchResults = document.getElementById("searchResults");
 document.body.appendChild(searchResults);
@@ -111,12 +114,17 @@ async function syncApi(path, options = {}) {
     if (!response.ok) throw new Error(`API request failed: ${response.status}`);
     const payload = await response.json();
     setGraphData(payload);
-    return true;
+    return payload;
   } catch (error) {
     console.warn("Unable to sync with API; keeping local state", error);
     apiState.available = false;
     return false;
   }
+}
+
+function setDrawerMessage(message) {
+  state.drawerMessage = message;
+  if (drawerStatus) drawerStatus.textContent = message || "";
 }
 
 function relationDisplay(relation) {
@@ -966,23 +974,47 @@ function saveLocalState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ relationState, referenceState, evidenceState, companyState }));
 }
 
-function exportGraphState() {
-  const payload = {
+function graphExportPayload() {
+  return {
     exported_at: new Date().toISOString(),
     nodes,
     relations,
     references: graphData.references,
     evidence_links: graphData.evidenceLinks
   };
+}
+
+function downloadJsonPayload(payload, filename) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "blackwell-graph-export.json";
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+async function exportGraphState() {
+  setDrawerMessage("Preparing backup...");
+
+  if (apiState.available) {
+    try {
+      const response = await fetch("/api/export", { headers: { Accept: "application/json" } });
+      if (response.ok) {
+        const payload = await response.json();
+        downloadJsonPayload(payload, "blackwell-graph-backup.json");
+        setDrawerMessage("Backend backup exported.");
+        return;
+      }
+    } catch (error) {
+      console.warn("Backend export unavailable; using local graph export", error);
+    }
+  }
+
+  downloadJsonPayload(graphExportPayload(), "blackwell-graph-export.json");
+  setDrawerMessage(apiState.available ? "Backend export unavailable; downloaded local JSON." : "Static mode: downloaded local JSON.");
 }
 
 function restoreLocalState() {
@@ -1074,11 +1106,11 @@ function renderDrawer() {
       relation.properties.evidence_priority
     ]));
   } else if (tab === "references") {
-    drawerContent.innerHTML = renderTable(["Title", "Type", "Status", "Publisher"], graphData.references.map((reference) => [
+    drawerContent.innerHTML = renderTable(["Title", "Type", "Status", "Detail"], graphData.references.map((reference) => [
       reference.title,
       reference.source_type,
       reference.status,
-      reference.metadata.publisher
+      referenceStatusDetail(reference)
     ]));
   } else if (tab === "evidence") {
     drawerContent.innerHTML = renderTable(["Reference", "Target", "Status", "Support", "Summary"], graphData.evidenceLinks.map((evidence) => [
@@ -1097,23 +1129,34 @@ function renderDrawer() {
 function renderInbox() {
   const candidateEvidence = graphData.evidenceLinks.filter((evidence) => evidence.status === "candidate");
   const candidateRelations = relations.filter((relation) => relation.status === "candidate");
+  const recentReferences = graphData.references.filter((reference) => reference.status !== "failed").slice(-6).reverse();
+  const failedReferences = graphData.references.filter((reference) => reference.status === "failed");
   return `
     <div class="inbox-list">
       <form class="ingest-form" data-source-ingest-form>
         <div>
           <strong>Ingest Source</strong>
-          <span>Paste notes, a source excerpt, or a URL summary. New findings stay candidate until reviewed.</span>
+          <span>Paste notes, a source excerpt, or a URL. URL fetching uses the backend when available.</span>
         </div>
         <label>
           <span>Source title</span>
           <input name="title" type="text" placeholder="e.g. Micron HBM3E note" required>
         </label>
         <label>
-          <span>Source text</span>
-          <textarea name="text" rows="3" placeholder="Mention known nodes like Micron, HBM3E, TSMC, CoWoS..." required></textarea>
+          <span>URL</span>
+          <input name="url" type="url" placeholder="https://example.com/source">
+        </label>
+        <label>
+          <span>Source text / notes</span>
+          <textarea name="text" rows="3" placeholder="Mention known nodes like Micron, HBM3E, TSMC, CoWoS..."></textarea>
         </label>
         <button type="submit">Create Candidates</button>
       </form>
+      ${state.inboxMessage ? `<div class="inbox-message ${state.inboxMessage.kind}">${state.inboxMessage.text}</div>` : ""}
+      <div class="inbox-subhead">References</div>
+      ${recentReferences.map(renderReferenceInboxItem).join("") || `<div class="empty-state">No references ingested yet.</div>`}
+      ${failedReferences.length ? `<div class="inbox-subhead">Failed ingestion</div>${failedReferences.map(renderReferenceInboxItem).join("")}` : ""}
+      <div class="inbox-subhead">Candidate evidence</div>
       ${candidateEvidence.map(renderInboxEvidence).join("") || `<div class="empty-state">No candidate evidence waiting for review.</div>`}
       ${candidateRelations.length ? `<div class="inbox-subhead">Candidate relations without confirmed evidence</div>` : ""}
       ${candidateRelations.slice(0, 8).map((relation) => `
@@ -1127,6 +1170,27 @@ function renderInbox() {
       `).join("")}
     </div>
   `;
+}
+
+function renderReferenceInboxItem(reference) {
+  const metadata = reference.metadata || {};
+  return `
+    <div class="inbox-item reference-item ${reference.status}" data-reference-id="${reference.id}">
+      <div>
+        <strong>${reference.title}</strong>
+        <span>${reference.source_type} / ${reference.status} / ${referenceStatusDetail(reference)}</span>
+        ${metadata.url ? `<p>${metadata.url}</p>` : ""}
+        ${metadata.error ? `<p>${metadata.error}</p>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function referenceStatusDetail(reference) {
+  const metadata = reference.metadata || {};
+  if (metadata.error) return metadata.error;
+  if (metadata.url) return metadata.url;
+  return metadata.publisher || "-";
 }
 
 function renderInboxEvidence(evidence) {
@@ -1156,8 +1220,9 @@ function bindInboxActions() {
       const formData = new FormData(ingestForm);
       ingestSource({
         title: formData.get("title"),
+        url: formData.get("url"),
         text: formData.get("text"),
-        source_type: "manual"
+        source_type: formData.get("url") ? "url" : "manual"
       });
     });
   }
@@ -1189,22 +1254,68 @@ async function reviewEvidence(evidenceId, action) {
 
 async function ingestSource(values) {
   const title = String(values.title || "").trim();
+  const url = String(values.url || "").trim();
   const text = String(values.text || "").trim();
-  if (!title || !text) return;
+  if (!title || (!text && !url)) {
+    state.inboxMessage = { kind: "failed", text: "Add a source title plus either URL or notes." };
+    render();
+    return;
+  }
 
-  const synced = await syncApi("/api/sources/ingest", { body: { title, text, source_type: values.source_type || "manual" } });
-  if (synced) {
+  if (url && !text) {
+    const synced = await syncApi("/api/sources/ingest-url", { body: { title, url, source_type: "url" } });
+    if (synced) {
+      const ingest = synced.ingest || {};
+      state.inboxMessage = ingest.status === "failed"
+        ? { kind: "failed", text: `URL ingest failed: ${ingest.error || "Could not fetch source."}` }
+        : { kind: "processed", text: ingest.duplicate ? "URL source already ingested recently." : "URL source ingested from backend." };
+      state.activeDrawerTab = "references";
+      state.drawerOpen = true;
+      render();
+      return;
+    }
+
+    recordFailedUrlReference({ title, url });
+    saveLocalState();
+    state.inboxMessage = { kind: "failed", text: "Backend unavailable. The URL reference was saved locally as failed for retry." };
     state.activeDrawerTab = "candidates";
     state.drawerOpen = true;
     render();
     return;
   }
 
-  ingestSourceLocally({ title, text, source_type: values.source_type || "manual" });
+  const synced = await syncApi("/api/sources/ingest", { body: { title, text, source_type: values.source_type || "manual" } });
+  if (synced) {
+    state.inboxMessage = { kind: "processed", text: url ? "Source notes ingested. URL metadata depends on backend support." : "Source notes ingested." };
+    state.activeDrawerTab = "candidates";
+    state.drawerOpen = true;
+    render();
+    return;
+  }
+
+  ingestSourceLocally({ title, url, text, source_type: values.source_type || "manual" });
   saveLocalState();
+  state.inboxMessage = { kind: "processed", text: "Source notes ingested locally." };
   state.activeDrawerTab = "candidates";
   state.drawerOpen = true;
   render();
+}
+
+function recordFailedUrlReference(values) {
+  const now = Date.now();
+  const reference = {
+    id: `failed_url_ref_${now}`,
+    title: values.title,
+    source_type: "url",
+    status: "failed",
+    metadata: {
+      url: values.url,
+      created_at: new Date(now).toISOString(),
+      error: "URL fetch backend is not connected in this prototype."
+    }
+  };
+  graphData.references.push(reference);
+  referencesById.set(reference.id, reference);
 }
 
 function ingestSourceLocally(values) {
@@ -1221,6 +1332,7 @@ function ingestSourceLocally(values) {
     status: "processed",
     metadata: {
       publisher: "Manual ingest",
+      url: values.url || undefined,
       created_at: new Date(now).toISOString(),
       matched_nodes: [...matchedIds],
       text: values.text

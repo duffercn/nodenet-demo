@@ -50,6 +50,9 @@ http://127.0.0.1:5173/
 - Manual relation evidence capture: add a source title, summary, and support level as candidate EvidenceLink.
 - Actionable Evidence Inbox: candidate evidence can be opened, confirmed, or rejected from the drawer.
 - Source ingest: paste a title and source text to create candidate evidence for mentioned graph relations.
+- URL ingest UI: fetch URL-only sources through the backend when available, with local failed-reference fallback in static mode.
+- Reference visibility: the Evidence Inbox and References drawer show processed and failed references with their status detail.
+- Export/backup control: tries the backend backup endpoint when available and falls back to a local JSON download.
 - Review persistence through FastAPI + SQLite when the backend is running.
 - Static fallback persistence in local storage when the backend is unavailable.
 - Candidate relations hidden from the default map but visible as badges, card updates, and the candidate drawer.
@@ -58,4 +61,4 @@ http://127.0.0.1:5173/
 
 ## Current Boundary
 
-This prototype does not yet include real AI extraction or URL fetching. Source ingest currently uses conservative local matching against known graph nodes and relations.
+This prototype does not yet include real AI extraction. Source ingest currently uses conservative matching against known graph nodes and relations. URL-only ingest uses the FastAPI backend when available; static mode records the URL as a failed reference so the user can retry with backend support.
