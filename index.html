@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blackwell Industry Map</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-mark">B</div>
+        <div class="title-block">
+          <strong>Blackwell Industry Map</strong>
+          <span>Personal industry-chain research workspace</span>
+        </div>
+        <label class="search-box" aria-label="Search graph">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="nodes, tickers, relations, evidence...">
+        </label>
+        <div class="view-tabs" role="tablist" aria-label="View mode">
+          <button class="active" type="button" data-view="map" title="Canvas">Canvas</button>
+          <button type="button" data-view="table" title="Open data drawer">Data</button>
+          <button type="button" data-view="evidence" title="Open evidence inbox">Inbox</button>
+        </div>
+        <button id="toggleCandidates" class="command" type="button" aria-pressed="false">
+          Candidates <span id="candidateCount" class="pill">0</span>
+        </button>
+        <button id="refreshMarket" class="command" type="button">Refresh Market</button>
+        <button id="openInbox" class="command" type="button">
+          Evidence Inbox <span id="inboxCount" class="pill">0</span>
+        </button>
+      </header>
+
+      <aside class="sidebar">
+        <section>
+          <div class="section-heading">
+            <h2>Saved Views</h2>
+            <button type="button" class="icon-button" aria-label="Add saved view">+</button>
+          </div>
+          <button class="saved-view active" type="button" data-focus="theme_blackwell">Blackwell Supply Chain</button>
+          <button class="saved-view" type="button" data-category="memory">Memory Ecosystem</button>
+          <button class="saved-view" type="button" data-category="packaging">Advanced Packaging</button>
+          <button class="saved-view" type="button" data-category="networking">Networking Chain</button>
+        </section>
+
+        <section>
+          <div class="section-heading">
+            <h2>Modules</h2>
+          </div>
+          <div id="moduleFilters" class="filter-list"></div>
+        </section>
+
+        <section>
+          <div class="section-heading">
+            <h2>Node Types</h2>
+          </div>
+          <div id="typeFilters" class="filter-list"></div>
+        </section>
+
+        <section>
+          <div class="section-heading">
+            <h2>Status</h2>
+          </div>
+          <label class="check-row">
+            <input id="statusConfirmed" type="checkbox" checked>
+            <span class="dot confirmed"></span>
+            Confirmed
+          </label>
+          <label class="check-row">
+            <input id="statusDisputed" type="checkbox" checked>
+            <span class="dot disputed"></span>
+            Disputed
+          </label>
+          <label class="check-row">
+            <input id="statusCandidate" type="checkbox">
+            <span class="dot candidate"></span>
+            Show candidates
+          </label>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <div class="map-toolbar">
+          <div class="graph-mode-toggle" aria-label="Graph mode">
+            <button id="focusMode" class="active" type="button" data-graph-mode="focus">Focus</button>
+            <button id="globalMode" type="button" data-graph-mode="global">Global</button>
+          </div>
+          <button type="button" class="tool active" data-tool="select" title="Select">↖</button>
+          <button type="button" class="tool" data-tool="pan" title="Pan">✋</button>
+          <button type="button" class="tool" data-tool="fit" title="Fit view">⛶</button>
+          <div class="legend">
+            <span><i class="legend-swatch product"></i>Product</span>
+            <span><i class="legend-swatch technology"></i>Technology</span>
+            <span><i class="legend-swatch company"></i>Company</span>
+            <span><i class="legend-line candidate"></i>Candidate</span>
+          </div>
+        </div>
+        <div id="searchResults" class="search-results" hidden></div>
+        <svg id="graphCanvas" class="graph-canvas" role="img" aria-label="Blackwell supply chain graph"></svg>
+      </main>
+
+      <aside id="detailPanel" class="detail-panel" aria-live="polite"></aside>
+
+      <section class="bottom-drawer">
+        <div class="drawer-tabs">
+          <button class="active" type="button" data-tab="nodes">Nodes</button>
+          <button type="button" data-tab="relations">Relations</button>
+          <button type="button" data-tab="references">References</button>
+          <button type="button" data-tab="evidence">Evidence</button>
+          <button type="button" data-tab="candidates">Candidates</button>
+          <div class="drawer-actions">
+            <button id="exportGraph" type="button">Export JSON</button>
+            <button id="resetLocalState" type="button">Reset Review</button>
+          </div>
+        </div>
+        <div id="drawerContent" class="drawer-content"></div>
+      </section>
+    </div>
+
+    <script src="./data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
