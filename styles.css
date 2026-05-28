@@ -628,10 +628,10 @@ h2 {
 }
 
 .search-results {
-  position: absolute;
-  z-index: 6;
+  position: fixed;
+  z-index: 30;
   top: 68px;
-  left: 20px;
+  left: 88px;
   width: 360px;
   max-height: 420px;
   overflow: auto;
@@ -1076,6 +1076,64 @@ table.data-table {
   display: grid;
   gap: 10px;
   padding: 12px;
+}
+
+.ingest-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.85fr) minmax(180px, 1fr) minmax(260px, 1.5fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.ingest-form strong,
+.ingest-form span {
+  display: block;
+}
+
+.ingest-form span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ingest-form label {
+  display: grid;
+  gap: 5px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ingest-form input,
+.ingest-form textarea {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  resize: vertical;
+}
+
+.ingest-form input:focus,
+.ingest-form textarea:focus {
+  border-color: #8ebcff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.ingest-form button {
+  height: 36px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: var(--blue);
+  border: 1px solid var(--blue);
+  border-radius: 8px;
 }
 
 .inbox-subhead {

@@ -11,15 +11,17 @@ const state = {
   focusedCategory: null
 };
 
-const nodes = graphData.nodes;
-const nodeById = new Map(nodes.map((node) => [node.id, node]));
-const relations = graphData.relations.map((relation) => ({
-  ...relation,
-  tupleId: `${relation.source}:${relation.type}:${relation.target}`
-}));
-const relationById = new Map(relations.map((relation) => [relation.id, relation]));
-const relationByTuple = new Map(relations.map((relation) => [relation.tupleId, relation]));
-const referencesById = new Map(graphData.references.map((reference) => [reference.id, reference]));
+let nodes = [];
+let nodeById = new Map();
+let relations = [];
+let relationById = new Map();
+let relationByTuple = new Map();
+let referencesById = new Map();
+
+const apiState = {
+  available: false,
+  loading: false
+};
 
 const categoryLabels = {
   compute: "Compute",
@@ -60,7 +62,62 @@ const detailPanel = document.getElementById("detailPanel");
 const drawerContent = document.getElementById("drawerContent");
 const searchInput = document.getElementById("searchInput");
 const searchResults = document.getElementById("searchResults");
+document.body.appendChild(searchResults);
 const STORAGE_KEY = "nodenet.blackwell.prototype.v1";
+
+function setGraphData(nextGraphData) {
+  graphData.nodes = nextGraphData.nodes || [];
+  graphData.relations = (nextGraphData.relations || []).map((relation) => ({
+    ...relation,
+    properties: relation.properties || {},
+    tupleId: relation.tupleId || `${relation.source}:${relation.type}:${relation.target}`
+  }));
+  graphData.references = nextGraphData.references || [];
+  graphData.evidenceLinks = nextGraphData.evidenceLinks || nextGraphData.evidence_links || [];
+
+  nodes = graphData.nodes;
+  nodeById = new Map(nodes.map((node) => [node.id, node]));
+  relations = graphData.relations;
+  relationById = new Map(relations.map((relation) => [relation.id, relation]));
+  relationByTuple = new Map(relations.map((relation) => [relation.tupleId, relation]));
+  referencesById = new Map(graphData.references.map((reference) => [reference.id, reference]));
+}
+
+async function loadApiGraph() {
+  apiState.loading = true;
+  try {
+    const response = await fetch("/api/graph", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`API unavailable: ${response.status}`);
+    const payload = await response.json();
+    setGraphData(payload);
+    apiState.available = true;
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    apiState.available = false;
+    restoreLocalState();
+  } finally {
+    apiState.loading = false;
+  }
+}
+
+async function syncApi(path, options = {}) {
+  if (!apiState.available) return false;
+  try {
+    const response = await fetch(path, {
+      method: options.method || "POST",
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      body: options.body ? JSON.stringify(options.body) : undefined
+    });
+    if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+    const payload = await response.json();
+    setGraphData(payload);
+    return true;
+  } catch (error) {
+    console.warn("Unable to sync with API; keeping local state", error);
+    apiState.available = false;
+    return false;
+  }
+}
 
 function relationDisplay(relation) {
   const source = nodeById.get(relation.source);
@@ -803,9 +860,15 @@ function renderRelationEvidenceStatus(relation) {
   `;
 }
 
-function reviewRelation(relationId, action) {
+async function reviewRelation(relationId, action) {
   const relation = relationById.get(relationId);
   if (!relation) return;
+
+  const synced = await syncApi(`/api/relations/${encodeURIComponent(relationId)}/review`, { body: { action } });
+  if (synced) {
+    render();
+    return;
+  }
 
   if (action === "confirm") {
     relation.status = "confirmed";
@@ -833,9 +896,16 @@ function reviewRelation(relationId, action) {
   render();
 }
 
-function addRelationEvidence(relationId, values) {
+async function addRelationEvidence(relationId, values) {
   const relation = relationById.get(relationId);
   if (!relation) return;
+
+  const synced = await syncApi(`/api/relations/${encodeURIComponent(relationId)}/evidence`, { body: values });
+  if (synced) {
+    render();
+    return;
+  }
+
   const now = Date.now();
   const referenceId = `user_ref_${now}`;
   const evidenceId = `user_ev_${now}`;
@@ -1029,6 +1099,21 @@ function renderInbox() {
   const candidateRelations = relations.filter((relation) => relation.status === "candidate");
   return `
     <div class="inbox-list">
+      <form class="ingest-form" data-source-ingest-form>
+        <div>
+          <strong>Ingest Source</strong>
+          <span>Paste notes, a source excerpt, or a URL summary. New findings stay candidate until reviewed.</span>
+        </div>
+        <label>
+          <span>Source title</span>
+          <input name="title" type="text" placeholder="e.g. Micron HBM3E note" required>
+        </label>
+        <label>
+          <span>Source text</span>
+          <textarea name="text" rows="3" placeholder="Mention known nodes like Micron, HBM3E, TSMC, CoWoS..." required></textarea>
+        </label>
+        <button type="submit">Create Candidates</button>
+      </form>
       ${candidateEvidence.map(renderInboxEvidence).join("") || `<div class="empty-state">No candidate evidence waiting for review.</div>`}
       ${candidateRelations.length ? `<div class="inbox-subhead">Candidate relations without confirmed evidence</div>` : ""}
       ${candidateRelations.slice(0, 8).map((relation) => `
@@ -1064,6 +1149,19 @@ function renderInboxEvidence(evidence) {
 }
 
 function bindInboxActions() {
+  const ingestForm = drawerContent.querySelector("[data-source-ingest-form]");
+  if (ingestForm) {
+    ingestForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(ingestForm);
+      ingestSource({
+        title: formData.get("title"),
+        text: formData.get("text"),
+        source_type: "manual"
+      });
+    });
+  }
+
   drawerContent.querySelectorAll("[data-inbox-open-relation]").forEach((button) => {
     button.addEventListener("click", () => selectRelation(button.dataset.inboxOpenRelation));
   });
@@ -1072,14 +1170,125 @@ function bindInboxActions() {
   });
 }
 
-function reviewEvidence(evidenceId, action) {
+async function reviewEvidence(evidenceId, action) {
   const evidence = graphData.evidenceLinks.find((item) => item.id === evidenceId);
   if (!evidence) return;
+
+  const synced = await syncApi(`/api/evidence/${encodeURIComponent(evidenceId)}/review`, { body: { action } });
+  if (synced) {
+    render();
+    return;
+  }
+
   evidence.status = action === "confirm" ? "confirmed" : "rejected";
   const relation = relationByTuple.get(evidence.target_id) || relationById.get(evidence.target_id);
   if (relation && action === "confirm") relation.status = "confirmed";
   saveLocalState();
   render();
+}
+
+async function ingestSource(values) {
+  const title = String(values.title || "").trim();
+  const text = String(values.text || "").trim();
+  if (!title || !text) return;
+
+  const synced = await syncApi("/api/sources/ingest", { body: { title, text, source_type: values.source_type || "manual" } });
+  if (synced) {
+    state.activeDrawerTab = "candidates";
+    state.drawerOpen = true;
+    render();
+    return;
+  }
+
+  ingestSourceLocally({ title, text, source_type: values.source_type || "manual" });
+  saveLocalState();
+  state.activeDrawerTab = "candidates";
+  state.drawerOpen = true;
+  render();
+}
+
+function ingestSourceLocally(values) {
+  const now = Date.now();
+  const referenceId = `ingest_ref_${now}`;
+  const haystack = `${values.title} ${values.text}`.toLowerCase();
+  const matchedNodes = nodes.filter((node) => nodeAliases(node).some((alias) => haystack.includes(alias)));
+  const matchedIds = new Set(matchedNodes.map((node) => node.id));
+  const summary = values.text.length > 220 ? `${values.text.slice(0, 217)}...` : values.text;
+  graphData.references.push({
+    id: referenceId,
+    title: values.title,
+    source_type: values.source_type,
+    status: "processed",
+    metadata: {
+      publisher: "Manual ingest",
+      created_at: new Date(now).toISOString(),
+      matched_nodes: [...matchedIds],
+      text: values.text
+    }
+  });
+  referencesById.set(referenceId, graphData.references[graphData.references.length - 1]);
+
+  let created = 0;
+  const existingPairs = new Set();
+  relations.forEach((relation) => {
+    existingPairs.add(`${relation.source}|${relation.target}`);
+    existingPairs.add(`${relation.target}|${relation.source}`);
+    if (!matchedIds.has(relation.source) || !matchedIds.has(relation.target)) return;
+    graphData.evidenceLinks.push(candidateEvidenceFromIngest(referenceId, relation.tupleId, summary, created));
+    created += 1;
+  });
+
+  matchedNodes.forEach((source) => {
+    matchedNodes.forEach((target) => {
+      if (created >= 6 || source.id === target.id || existingPairs.has(`${source.id}|${target.id}`)) return;
+      const type = inferLocalRelationType(source, target);
+      if (!type) return;
+      const relation = {
+        id: `rel_${relations.length + 1}`,
+        source: source.id,
+        type,
+        target: target.id,
+        status: "candidate",
+        confidence: "low",
+        properties: { evidence_priority: "useful", created_by: "source_ingest" },
+        tupleId: `${source.id}:${type}:${target.id}`
+      };
+      relations.push(relation);
+      graphData.relations.push(relation);
+      relationById.set(relation.id, relation);
+      relationByTuple.set(relation.tupleId, relation);
+      graphData.evidenceLinks.push(candidateEvidenceFromIngest(referenceId, relation.tupleId, summary, created));
+      existingPairs.add(`${source.id}|${target.id}`);
+      existingPairs.add(`${target.id}|${source.id}`);
+      created += 1;
+    });
+  });
+}
+
+function candidateEvidenceFromIngest(referenceId, targetId, summary, index) {
+  return {
+    id: `ingest_ev_${Date.now()}_${index}`,
+    reference_id: referenceId,
+    target_type: "relation",
+    target_id: targetId,
+    status: "candidate",
+    support_level: "supports",
+    summary,
+    properties: { created_by: "source_ingest" }
+  };
+}
+
+function nodeAliases(node) {
+  const aliases = [node.title, node.id.replaceAll("_", " "), node.titleZh, node.properties?.ticker];
+  return aliases.filter((alias) => alias && alias.length >= 2).map((alias) => String(alias).toLowerCase());
+}
+
+function inferLocalRelationType(source, target) {
+  if (source.type === "company" && target.type === "technology") return "exposed_to";
+  if (source.type === "company" && target.type === "product") return "exposed_to";
+  if (source.type === "product" && target.type === "technology") return "requires";
+  if (source.type === "metric" && ["product", "technology"].includes(target.type)) return "affects";
+  return null;
 }
 
 function renderTable(headers, rows) {
@@ -1209,7 +1418,13 @@ function bindEvents() {
     });
   });
 
-  document.getElementById("refreshMarket").addEventListener("click", () => {
+  document.getElementById("refreshMarket").addEventListener("click", async () => {
+    const synced = await syncApi("/api/market/refresh");
+    if (synced) {
+      render();
+      return;
+    }
+
     nodes.filter((node) => node.type === "company" && node.properties.ticker).forEach((node, index) => {
       if (!node.properties.market_snapshot) node.properties.market_snapshot = {};
       node.properties.market_snapshot.return_1d = Number((((index % 7) - 3) * 0.42).toFixed(2));
@@ -1260,6 +1475,11 @@ function bindEvents() {
   });
 }
 
-restoreLocalState();
-bindEvents();
-render();
+async function init() {
+  setGraphData(graphData);
+  await loadApiGraph();
+  bindEvents();
+  render();
+}
+
+init();
