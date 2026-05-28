@@ -1431,10 +1431,15 @@ function renderSearch() {
   }).slice(0, 8);
   const relationMatches = relations.filter((relation) => relationDisplay(relation).toLowerCase().includes(query)).slice(0, 6);
   const evidenceMatches = graphData.evidenceLinks.filter((evidence) => evidence.summary.toLowerCase().includes(query)).slice(0, 4);
+  const referenceMatches = graphData.references.filter((reference) => {
+    const haystack = `${reference.title} ${reference.source_type} ${reference.status} ${referenceStatusDetail(reference)} ${JSON.stringify(reference.metadata || {})}`.toLowerCase();
+    return haystack.includes(query);
+  }).slice(0, 4);
   const html = [
     ...nodeMatches.map((node) => `<button class="search-result" data-kind="node" data-id="${node.id}"><strong>${node.title}</strong><span>${typeLabels[node.type]} / ${node.status}</span></button>`),
     ...relationMatches.map((relation) => `<button class="search-result" data-kind="relation" data-id="${relation.id}"><strong>${relationDisplay(relation)}</strong><span>${relation.status} / ${relation.confidence}</span></button>`),
-    ...evidenceMatches.map((evidence) => `<button class="search-result" data-kind="evidence" data-id="${evidence.id}"><strong>${referencesById.get(evidence.reference_id)?.title || evidence.reference_id}</strong><span>${evidence.summary}</span></button>`)
+    ...evidenceMatches.map((evidence) => `<button class="search-result" data-kind="evidence" data-id="${evidence.id}"><strong>${referencesById.get(evidence.reference_id)?.title || evidence.reference_id}</strong><span>${evidence.summary}</span></button>`),
+    ...referenceMatches.map((reference) => `<button class="search-result" data-kind="reference" data-id="${reference.id}"><strong>${reference.title}</strong><span>${reference.source_type} / ${reference.status}</span></button>`)
   ].join("");
   searchResults.innerHTML = html || `<div class="empty-state">No matching graph objects.</div>`;
   searchResults.hidden = false;
@@ -1444,7 +1449,22 @@ function renderSearch() {
       if (button.dataset.kind === "relation") selectRelation(button.dataset.id);
       if (button.dataset.kind === "evidence") {
         state.activeDrawerTab = "evidence";
+        state.drawerOpen = true;
+        state.search = "";
+        searchInput.value = "";
         searchResults.hidden = true;
+        searchResults.innerHTML = "";
+        document.querySelectorAll(".drawer-tabs button").forEach((item) => item.classList.toggle("active", item.dataset.tab === "evidence"));
+        render();
+      }
+      if (button.dataset.kind === "reference") {
+        state.activeDrawerTab = "references";
+        state.drawerOpen = true;
+        state.search = "";
+        searchInput.value = "";
+        searchResults.hidden = true;
+        searchResults.innerHTML = "";
+        document.querySelectorAll(".drawer-tabs button").forEach((item) => item.classList.toggle("active", item.dataset.tab === "references"));
         render();
       }
     });
