@@ -1322,7 +1322,7 @@ function ingestSourceLocally(values) {
   const now = Date.now();
   const referenceId = `ingest_ref_${now}`;
   const haystack = `${values.title} ${values.text}`.toLowerCase();
-  const matchedNodes = nodes.filter((node) => nodeAliases(node).some((alias) => haystack.includes(alias)));
+  const matchedNodes = nodes.filter((node) => nodeAliases(node).some((alias) => aliasInText(alias, haystack)));
   const matchedIds = new Set(matchedNodes.map((node) => node.id));
   const summary = values.text.length > 220 ? `${values.text.slice(0, 217)}...` : values.text;
   graphData.references.push({
@@ -1345,6 +1345,7 @@ function ingestSourceLocally(values) {
   relations.forEach((relation) => {
     existingPairs.add(`${relation.source}|${relation.target}`);
     existingPairs.add(`${relation.target}|${relation.source}`);
+    if (["contains", "groups"].includes(relation.type)) return;
     if (!matchedIds.has(relation.source) || !matchedIds.has(relation.target)) return;
     graphData.evidenceLinks.push(candidateEvidenceFromIngest(referenceId, relation.tupleId, summary, created));
     created += 1;
@@ -1391,8 +1392,21 @@ function candidateEvidenceFromIngest(referenceId, targetId, summary, index) {
 }
 
 function nodeAliases(node) {
-  const aliases = [node.title, node.id.replaceAll("_", " "), node.titleZh, node.properties?.ticker];
-  return aliases.filter((alias) => alias && alias.length >= 2).map((alias) => String(alias).toLowerCase());
+  const aliases = [node.title, node.id.replaceAll("_", " "), node.titleZh, node.properties?.ticker, ...(node.properties?.aliases || [])];
+  return aliases
+    .filter((alias) => alias && String(alias).length >= 3)
+    .map((alias) => String(alias).toLowerCase());
+}
+
+function aliasInText(alias, text) {
+  if (/^[a-z0-9][a-z0-9 ]+[a-z0-9]$/.test(alias)) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegex(alias)}([^a-z0-9]|$)`).test(text);
+  }
+  return text.includes(alias);
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function inferLocalRelationType(source, target) {

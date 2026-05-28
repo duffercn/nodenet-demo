@@ -11,7 +11,7 @@ const graphData = {
     { id: "module_server_odm", type: "module", title: "Server / ODM", status: "confirmed", layer: "module", x: 630, y: 430, properties: { category: "server" } },
     { id: "module_cloud", type: "module", title: "Cloud Customers", status: "confirmed", layer: "module", x: 850, y: 430, properties: { category: "cloud" } },
 
-    { id: "product_blackwell_gpu", type: "product", title: "Blackwell GPU", status: "confirmed", layer: "product", x: 410, y: 255, summary: "Core Blackwell accelerator product family.", properties: { category: "compute", importance: "high" } },
+    { id: "product_blackwell_gpu", type: "product", title: "Blackwell GPU", status: "confirmed", layer: "product", x: 410, y: 255, summary: "Core Blackwell accelerator product family.", properties: { category: "compute", importance: "high", aliases: ["Blackwell", "NVIDIA Blackwell", "B200", "GB200"] } },
     { id: "product_gb200_nvl72", type: "product", title: "GB200 NVL72", status: "confirmed", layer: "product", x: 555, y: 255, summary: "Blackwell-based rack-scale system.", properties: { category: "system" } },
     { id: "product_ai_server", type: "product", title: "AI Server", status: "confirmed", layer: "product", x: 675, y: 365, summary: "Server platform hosting AI accelerators.", properties: { category: "server" } },
     { id: "product_800g_optical_module", type: "product", title: "800G Optical Module", status: "confirmed", layer: "product", x: 920, y: 255, summary: "Optical interconnect product for AI data center networking.", properties: { category: "networking" } },
@@ -34,7 +34,7 @@ const graphData = {
     { id: "company_tsmc", type: "company", title: "TSMC", status: "confirmed", layer: "company", x: 610, y: 365, properties: { ticker: "TSM", market: "NYSE", category: "foundry_packaging", market_snapshot: { return_1d: 0.7, fetch_quality: "placeholder" } } },
     { id: "company_sk_hynix", type: "company", title: "SK hynix", status: "confirmed", layer: "company", x: 185, y: 335, properties: { ticker: "000660.KS", market: "KRX", category: "memory" } },
     { id: "company_micron", type: "company", title: "Micron", status: "confirmed", layer: "company", x: 185, y: 410, properties: { ticker: "MU", market: "NASDAQ", category: "memory", market_snapshot: { return_1d: 2.1, fetch_quality: "placeholder" } } },
-    { id: "company_samsung", type: "company", title: "Samsung Electronics", status: "confirmed", layer: "company", x: 315, y: 410, properties: { ticker: "005930.KS", market: "KRX", category: "memory" } },
+    { id: "company_samsung", type: "company", title: "Samsung Electronics", status: "confirmed", layer: "company", x: 315, y: 410, properties: { ticker: "005930.KS", market: "KRX", category: "memory", aliases: ["Samsung"] } },
     { id: "company_broadcom", type: "company", title: "Broadcom", status: "confirmed", layer: "company", x: 1040, y: 185, properties: { ticker: "AVGO", market: "NASDAQ", category: "networking" } },
     { id: "company_marvell", type: "company", title: "Marvell", status: "confirmed", layer: "company", x: 1040, y: 255, properties: { ticker: "MRVL", market: "NASDAQ", category: "networking" } },
     { id: "company_vertiv", type: "company", title: "Vertiv", status: "confirmed", layer: "company", x: 275, y: 600, properties: { ticker: "VRT", market: "NYSE", category: "power_cooling" } },
